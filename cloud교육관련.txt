@@ -1,0 +1,76 @@
+kubectl run cgps-reservation --image=gcr.io/gentle-studio-238108/cgps-reservation:0.2 
+
+docker build -t gcr.io/gentle-studio-238108/cgps-reservation:0.1 .
+
+
+gcr.io/gentle-studio-238108/cgps-reservation
+
+docker build -t gcr.io/gentle-studio-238108/cgps-reservation:v1 .
+
+kubectl run cgps-reservation --image=docker.io/icepegasus/cgps-reservation:2.0
+
+
+kubectl expose deploy/cgps-reservation --port=8090 --type=LoadBalancer
+
+
+https://kubernetes.io/docs/tutorials/kubernetes-basics/create-cluster/cluster-interactive/
+
+kubectl exec -it cgps-reservation-6dbf9dd554-khlcp -- /bin/bash
+kubectl exec -it cgps-score-6dbf9dd554-khlcp -- /bin/bash
+
+
+
+
+ssh -i "team5-keypair.pem" ubuntu@ec2-13-124-227-11.ap-northeast-2.compute.amazonaws.com
+
+
+--ec2 에 minikube 설치
+
+https://www.radishlogic.com/kubernetes/running-minikube-in-aws-ec2-ubuntu/
+
+--도커빌드
+
+docker build -t gcr.io/gentle-studio-238108/cgps-reservation:0.1 .
+docker build -t icepegasus/cgps-reservation:2.0 .
+docker build -t icepegasus/cgps-score:2.0 .
+
+
+--도커 push
+
+docker push icepegasus/cgps-reservation:2.0
+docker push icepegasus/cgps-menu:2.0
+docker push icepegasus/cgps-score:2.0
+
+
+--aws ec2 ubuntu 접속
+ssh -i "team5-keypair.pem" ubuntu@ec2-13-124-227-11.ap-northeast-2.compute.amazonaws.com
+
+-- kubenetes deply
+
+sudo -i
+
+kubectl run cgps-reservation --image=docker.io/icepegasus/cgps-reservation:2.0 --port=8090
+
+kubectl run cgps-menu --image=docker.io/icepegasus/cgps-menu:2.0 --port=8080
+
+kubectl run cgps-score --image=docker.io/icepegasus/cgps-score:2.0 --port=8070
+
+--NodePort 서비스로 재배포
+kubectl expose deployment cgps-reservation --type=NodePort
+
+kubectl expose deployment cgps-menu --type=NodePort
+
+kubectl expose deployment cgps-score --type=ClusterIP
+
+
+--이미지 변경시 재배포
+kubectl --record deployment.apps/nginx-deployment set image deployment.v1.apps/nginx-deployment nginx=nginx:1.9.1
+
+
+--configMap 관련
+
+kubectl create configmap app-config --from-literal=log.level=debug --from-literal=profile.type=dev
+
+--ECS 키페어 없이 비밀번호 기반으로 로그인
+https://ithub.tistory.com/215
+
