@@ -1,0 +1,664 @@
+##group07-user04-** 로 시작되는 이름 및 IP는 변경하셔야 합니다
+
+
+#######################################################
+Azure
+#######################################################
+
+## Azure_terraform.ppt 3~7 page 수행 후
+
+## 기본 설정
+[main.tf]
+provider "azurerm" {
+    subscription_id = "e0fae348-f6c2-45f5-87b7-c41c22782d8f"
+    client_id       = "dba205d4-4300-4403-83cf-612d1b8c064c"
+    client_secret   = "U*Tk]0kD3-*FYI8OHe4_U[:2?JR/cY=P"
+    tenant_id       = "96e3cac9-1ab3-436b-9f79-2a0a4b687f1b"
+}
+
+
+## 리소스그룹
+[resource.tf]
+resource "azurerm_resource_group" "group07user04" {
+    name     = "group07-user04"
+    location = "koreacentral"
+    }
+
+## VPC
+[myVnet.tf]  -- Subnet 생성 전에 생성
+resource "azurerm_virtual_network" "group07-user04-network" {
+ name                = "group07-user04"
+ address_space       = ["71.0.0.0/16"]
+ location            = "koreacentral"
+ resource_group_name = "${azurerm_resource_group.group07user04.name}" 
+}
+
+
+## 서브넷
+[mySubnet.tf]
+resource "azurerm_subnet" "group07-user04-subnet01" {
+    name                 = "group07-user04-subnet01"
+    resource_group_name  = "${azurerm_resource_group.group07user04.name}"
+    virtual_network_name = "${azurerm_virtual_network.group07-user04-network.name}"
+    address_prefix       = "71.0.1.0/24"
+}
+
+resource "azurerm_subnet" "group07-user04-subnet02" {
+    name                 = "group07-user04-subnet02"
+    resource_group_name  = "${azurerm_resource_group.group07user04.name}"
+    virtual_network_name = "${azurerm_virtual_network.group07-user04-network.name}"
+    address_prefix       = "71.0.2.0/24"
+}
+
+## 공용IP
+[myPublicIP.tf]
+resource "azurerm_public_ip" "groupo07-user04-publicip2" {
+    name                         = "groupo07-user04-publicip2"
+    location                     = "koreacentral"
+    resource_group_name          = "${azurerm_resource_group.group07user04.name}"
+    allocation_method            = "Dynamic"
+}
+
+## 보안그룹
+[myNetworkSG.tf]
+resource "azurerm_network_security_group" "group07-user04-SG1" {
+    name                = "group07-user04-SG1"
+    location            = "koreacentral"
+    resource_group_name = "group07-user04"
+
+    security_rule {
+        name                       = "HTTP"
+        priority                   = 1001
+        direction                  = "Inbound"
+        access                     = "Allow"
+        protocol                   = "Tcp"
+        source_port_range          = "*"
+        destination_port_range     = "80"
+        source_address_prefix      = "*"
+        destination_address_prefix = "*"
+    }
+
+    security_rule {
+        name                       = "SSH"
+        priority                   = 1010
+        direction                  = "Inbound"
+        access                     = "Allow"
+        protocol                   = "Tcp"
+        source_port_range          = "*"
+        destination_port_range     = "22"
+        source_address_prefix      = "*"
+        destination_address_prefix = "*"
+    }
+}
+
+resource "azurerm_network_security_group" "group07-user04-SG2" {
+    name                = "group07-user04-SG2"
+    location            = "koreacentral"
+    resource_group_name = "group07-user04"
+
+    security_rule {
+        name                       = "mySQL"
+        priority                   = 1001
+        direction                  = "Inbound"
+        access                     = "Allow"
+        protocol                   = "Tcp"
+        source_port_range          = "*"
+        destination_port_range     = "3306"
+        source_address_prefix      = "*"
+        destination_address_prefix = "*"
+    }
+
+    security_rule {
+        name                       = "SSH"
+        priority                   = 1010
+        direction                  = "Inbound"
+        access                     = "Allow"
+        protocol                   = "Tcp"
+        source_port_range          = "*"
+        destination_port_range     = "22"
+        source_address_prefix      = "*"
+        destination_address_prefix = "*"
+    }
+}
+
+
+## 네트워크카드
+[myNIC.tf]
+resource "azurerm_network_interface" "group07-user04-nic3" {
+    name                = "group07-user04-nic3"
+    location            = "koreacentral"
+    resource_group_name = "group07-user04"
+    network_security_group_id = "${azurerm_network_security_group.group07-user04-SG1.id}"
+
+    ip_configuration {
+        name                          = "group07-user04-ip3"
+        subnet_id                     = "${azurerm_subnet.group07-user04-subnet01.id}"
+        private_ip_address_allocation = "Dynamic"
+        public_ip_address_id          = "${azurerm_public_ip.groupo07-user04-publicip.id}"
+    }
+}
+
+?
+
+resource "azurerm_network_interface" "group07-user04-nic4" {
+    name                = "group07-user04-nic4"
+    location            = "koreacentral"
+    resource_group_name = "group07-user04"
+    network_security_group_id = "${azurerm_network_security_group.group07-user04-SG2.id}"
+
+    ip_configuration {
+        name                          = "group07-user04-ip4"
+        subnet_id                     = "${azurerm_subnet.group07-user04-subnet02.id}"
+        private_ip_address_allocation = "Dynamic"
+    }
+}
+
+
+## 진단 저장소 계정
+[myRandomID.tf]
+resource "random_id" "group07-user04-randomId" {
+    keepers = {
+        # Generate a new ID only when a new resource group is defined
+        resource_group = "${azurerm_resource_group.group07user04.name}"
+    }
+
+    byte_length = 8
+}
+
+[myDaigStorage.tf]
+resource "azurerm_storage_account" "group07-user04-mystorageaccount" {
+    name                = "diag${random_id.group07-user04-randomId.hex}"
+    resource_group = "${azurerm_resource_group.group07user04.name}"
+    location            = "koreacentral"
+    account_replication_type = "LRS"
+    account_tier = "Standard"
+}
+
+
+resource "azurerm_storage_account" "group07-user04-storage" {?
+    name                = "diag${random_id.randomId.hex}"?
+    resource_group_name = "${azurerm_resource_group.group07user04.name}"
+    location            = "koreacentral"
+    account_replication_type = "LRS"?
+    account_tier = "Standard"?
+
+    tags = {?
+        environment = "Group07-user04"?
+    }?
+}
+
+
+## 가상서버
+
+## key_data는 아래 결과값 복붙
+
+## key_data
+> cd
+> ssh-keygen
+> cat ~/.ssh/id_rsa.pub
+
+
+[myVM.tf]
+resource "azurerm_virtual_machine" "group07-user04-vm3" {
+    name                  = "group07-user04-vm3"
+    location              = "koreacentral"
+    resource_group_name = "${azurerm_resource_group.group07user04.name}"
+    network_interface_ids = ["${azurerm_network_interface.group07-user04-nic3.id}"]
+    vm_size               = "Standard_DS1_v2"
+
+    storage_os_disk {
+        name              = "group07-user04-OsDisk3"
+        caching           = "ReadWrite"
+        create_option     = "FromImage"
+        managed_disk_type = "Premium_LRS"
+    }
+
+    storage_image_reference {
+        publisher = "Canonical"
+        offer     = "UbuntuServer"
+        sku       = "16.04.0-LTS"
+        version   = "latest"
+    }
+
+os_profile {
+        computer_name  = "group07-user04-vm3"
+        admin_username = "azureuser"
+        admin_password = "SKCNC123!@#"
+    }
+
+ os_profile_linux_config {
+        disable_password_authentication = true
+        ssh_keys {
+            path     = "/home/azureuser/.ssh/authorized_keys"
+            key_data = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC8woJTz8D29CuEIbRM23/pnsiJtk59mn3ChGMWbMKMzvuY92EEJNbKzD0xjvC6xK04hAvxoEmmiBO82Jki7nt2TXqvJqc/9mP/VtkXugdRY4EfjIPgjGqACgxdVplq9RruLsfK5aEbwhwqCuuREpP89Ovn96lzjV6AkSb0ZjP/sGAJHEbkPsk0GI818k4YfQnzQJcGQR0m3IofGqRcsp4RI1QRi9NF1MwH/cBBPt98RlpVyM5MJTpUswRholCW3xNU4N+MSDWf9oaZD9Ro7Mp0ZoBELepbvR/CrodyNwmBtk28CN1xhTC6BdPCX04vEbl+OXt4JVHYnPyP/fsw41MX user04@cc-7bd3cbe5-78459d86b-xckjl"
+        }
+    }
+
+    boot_diagnostics {
+        enabled     = "true"
+        storage_uri = "${azurerm_storage_account.group07-user04-storage.primary_blob_endpoint}"
+    }
+
+    tags = {
+        environment = "Group07-user04-Web2"
+    }
+
+}
+
+
+resource "azurerm_virtual_machine" "group07-user04-vm4" {
+    name                  = "group07-user04-vm4"
+    location              = "koreacentral"
+    resource_group_name = "${azurerm_resource_group.group07user04.name}"
+    network_interface_ids = ["${azurerm_network_interface.group07-user04-nic4.id}"]
+    vm_size               = "Standard_DS1_v2"
+
+    storage_os_disk {
+        name              = "group07-user04-OsDisk4"
+        caching           = "ReadWrite"
+        create_option     = "FromImage"
+        managed_disk_type = "Premium_LRS"
+    }
+
+    storage_image_reference {
+        publisher = "Canonical"
+        offer     = "UbuntuServer"
+        sku       = "16.04.0-LTS"
+        version   = "latest"
+    }
+
+os_profile {
+        computer_name  = "group07-user04-vm4"
+        admin_username = "azureuser"
+        admin_password = "SKCNC123!@#"
+    }
+
+ os_profile_linux_config {
+        disable_password_authentication = true
+        ssh_keys {
+            path     = "/home/azureuser/.ssh/authorized_keys"
+            key_data = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC8woJTz8D29CuEIbRM23/pnsiJtk59mn3ChGMWbMKMzvuY92EEJNbKzD0xjvC6xK04hAvxoEmmiBO82Jki7nt2TXqvJqc/9mP/VtkXugdRY4EfjIPgjGqACgxdVplq9RruLsfK5aEbwhwqCuuREpP89Ovn96lzjV6AkSb0ZjP/sGAJHEbkPsk0GI818k4YfQnzQJcGQR0m3IofGqRcsp4RI1QRi9NF1MwH/cBBPt98RlpVyM5MJTpUswRholCW3xNU4N+MSDWf9oaZD9Ro7Mp0ZoBELepbvR/CrodyNwmBtk28CN1xhTC6BdPCX04vEbl+OXt4JVHYnPyP/fsw41MX user04@cc-7bd3cbe5-78459d86b-xckjl"
+        }
+    }
+
+    boot_diagnostics {
+        enabled     = "true"
+        storage_uri = "${azurerm_storage_account.group07-user04-storage.primary_blob_endpoint}"
+    }
+
+    tags = {
+        environment = "Group07-user04-DB2"
+    }
+
+}
+
+
+## Web Server 접속
+ssh azureuser@52.231.26.248
+
+
+## Azure Terrform 콘솔에서  id_rsa, id_rsa.pub을 파일(내용)을 Web 서버 ~/.ssh 경로에 복붙
+
+
+## 퍼미션 변경
+chmod 400 id_rsa
+
+
+## 웹서버에 아파치, php 인스톨
+sudo -s
+apt-get update
+apt-get install apache2
+apt-get install php
+apt-get install libapache2-mod-php7.0
+apt-get install php-mysql
+
+# 웹서버 정상 확인
+브라우저: 20.41.72.29
+
+
+## DB서버 접속(root 빠져 나와서)
+
+ssh azureuser@71.0.2.5
+
+
+## MySQL 설치
+sudo -s
+apt-get update 
+apt-get install mariadb*
+
+#설치 확인
+ls -l  /etc/init.d/ mysql
+
+#실행
+service mysql start
+
+#실행 확인
+root@group07-user04-vm4:/etc/init.d# ps -ef |grep mysql
+root      19225      1  0 09:29 ?        00:00:00 /bin/bash /usr/bin/mysqld_safe
+mysql     19369  19225  0 09:29 ?        00:00:00 /usr/sbin/mysqld --basedir=/usr --datadir=/var/lib/mysql --plugin-dir=/usr/lib/mysql/plugin --user=mysql --skip-log-error --pid-file=/var/run/mysqld/mysqld.pid --socket=/var/run/mysqld/mysqld.sock --port=3306
+root      19370  19225  0 09:29 ?        00:00:00 logger -t mysqld -p daemon error
+root      19722   6805  0 09:32 pts/0    00:00:00 grep --color=auto mysql
+
+
+#접속확인
+root@group07-user04-vm4:/etc/init.d# mysql -uroot
+Welcome to the MariaDB monitor.  Commands end with ; or \g.
+Your MariaDB connection id is 50
+Server version: 10.0.38-MariaDB-0ubuntu0.16.04.1 Ubuntu 16.04
+
+Copyright (c) 2000, 2018, Oracle, MariaDB Corporation Ab and others.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+MariaDB [(none)]>
+
+
+#접속정보 변경
+vi /etc/mysql/mariadb.conf.d/50-server.cnf
+
+# localhost which is more compatible and is not less secure.
+bind-address         0.0.0.0
+
+
+#f 리슨포트 확인
+root@group07-user04-vm4:/etc/mysql/mariadb.conf.d# netstat -anp | grep 3306
+tcp        0      0 127.0.0.1:3306          0.0.0.0:*               LISTEN      19369/mysqld
+--> 0.0.0.0으로 변경되어야 함
+
+# 서비스 재기동
+service mysql restart
+
+root@group07-user04-vm4:/etc/mysql/mariadb.conf.d# netstat -anp | grep 3306
+tcp        0      0 0.0.0.0:3306            0.0.0.0:*               LISTEN      20223/mysqld
+
+
+
+
+#접속권함 및 암호 부여
+root@group07-user04-vm4:/etc/init.d# mysql -uroot
+
+grant all privileges on *.* to 'root'@'%' identified by 'SKCNC123!@#';
+
+flush privileges;
+
+
+
+## Web서버에서 작업
+
+vi /var/www/html/db.php
+
+[db.php]
+<!DOCTYPE html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+  <title>MySql-PHP 연결 테스트</title>
+</head>
+<body>
+<?php
+echo "MySql 연결 테스트<br>";
+$db = mysqli_connect("71.0.2.5", "root", "SKCNC123!@#", "mysql");  ##서버IP,  패스워드 등 변경
+if($db){
+	    echo "connect : 성공<br>";
+}
+else{
+    echo "disconnect : 실패<br>";
+}
+$result = mysqli_query($db, 'SELECT VERSION() as VERSION');
+$data = mysqli_fetch_assoc($result);
+echo $data['VERSION'];
+?>
+</body>
+</html>
+
+
+# 아파치 리스타트
+service apache2 restart
+service php7.0-fpm restart
+
+## 브라우저: http://20.41.72.29/db.php
+[이렇게 나오면 연결 성공]
+MySql 연결 테스트
+connect : 성공
+10.0.38-MariaDB-0ubuntu0.16.04.1
+
+
+
+## VMSS 설정
+
+# 웹서버 접속 후 디프리비전
+ssh azureuser@52.231.13.15
+sudo waagent -deprovision+user -force
+exit
+
+# 커스텀 이미지 생성
+az vm deallocate --resource-group group07-user01 --name group07-user01-vm3
+az vm generalize --resource-group group07-user01 --name group07-user01-vm3
+az image create --resource-group group07-user01 --name group07-user01-vm3-image --source group07-user01-vm3
+
+# 오토 스케일링(VMSS) 생성
+az vmss create --resource-group group07-user01 --name group07-user01-ScaleSet --image group07-user01-vm3-image --admin-username azureuser --generate-ssh-keys
+
+# 로드밸런스 룰 생성
+az network lb rule create \
+  --resource-group group07-user01 \
+  --name group07-user01-ScaleSetLB-rule \
+  --lb-name group07-user01-ScaleSetLB \
+  --backend-pool-name group07-user01-ScaleSetLBBEPool \
+  --backend-port 80 \
+  --frontend-ip-name loadBalancerFrontEnd \
+  --frontend-port 80 \
+  --protocol tcp
+
+
+#######################################################
+AWS
+#######################################################
+## Access Key 생성(하지말것)
+IAM ->  본인계정 --> 보안자격증명 --> 액세크키 만들기 --> 엑셀 다운로드
+
+ACCESS_KEY:  AKIAT6IQHQ7SLJXOIAVO
+SECRET_KEY : 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
+
+
+## 테라폼 설치
+wget https://releases.hashicorp.com/terraform/0.8.5/terraform_0.8.5_linux_386.zip
+sudo unzip terraform_0.8.5_linux_386.zip
+sudo mv terraform /usr/local/bin/
+user04:~/environment $ ls -l /usr/local/bin/terraform
+-rwxrwxr-x 1 root root 81168992 Jan 26  2017 /usr/local/bin/terraform
+export PATH=$PATH:/terraform-path/
+
+ 
+
+[provider.tf]
+provider "aws" {
+  region = "ap-northeast-1"
+}
+
+
+# 네트워크
+[vpc.tf]
+resource "aws_vpc" "group07-user04-vpc" {
+  cidr_block           = "107.0.0.0/16"
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+  instance_tenancy     = "default"
+
+  tags = {
+    Name = "group07-user04-vpc"
+  }
+}
+
+
+#서브넷
+[subnet.tf]
+resource "aws_subnet" "group07-user04-subnet1" {
+  vpc_id            = "${aws_vpc.group07-user04-vpc.id}"
+  availability_zone = "ap-northeast-1a"
+  cidr_block        = "107.0.1.0/24"
+
+  tags = {
+    Name = "group07-user04-subnet1"
+  }
+}
+
+
+resource "aws_subnet" "group07-user04-subnet2" {
+  vpc_id            = "${aws_vpc.group07-user04-vpc.id}"
+  availability_zone = "ap-northeast-1d"
+  cidr_block        = "107.0.2.0/24"
+
+  tags = {
+    Name = "group07-user04-subnet2"
+  }
+}
+
+
+#인터넷게이트웨이
+[igw.tf]
+resource "aws_internet_gateway" "group07-user04-igw" {
+  vpc_id = "${aws_vpc.group07-user04-vpc.id}"
+
+  tags = {
+    Name = "group07-user04-igw"
+  }
+}
+
+
+# 고정 IP
+[eip.tf]
+resource "aws_eip" "group07-user04-nat1" {
+  vpc = true
+}
+
+resource "aws_eip" "group07-user04-nat2" {
+  vpc = true
+}
+
+[nat_gateway.tf]  --> 5개 한계로 생성 불가 ==> Skip
+resource "aws_nat_gateway" "group07-user04-natgw1" {
+  allocation_id = "${aws_eip.group07-user04-nat1.id}"
+  subnet_id     = "${aws_subnet.group07-user04-subnet1.id}"
+}
+
+resource "aws_nat_gateway" "group07-user04-natgw2" {
+  allocation_id = "${aws_eip.group07-user04-nat2.id}"
+  subnet_id     = "${aws_subnet.group07-user04-subnet2.id}"
+}
+
+
+# 라우트 테이블
+[route_table.tf]
+resource "aws_route_table" "group07-user04-rtb" {
+  vpc_id = "${aws_vpc.group07-user04-vpc.id}"
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = "${aws_internet_gateway.group07-user04-igw.id}"
+  }
+
+  tags {
+    Name = "group07-user04-rtb"
+  }
+}
+
+resource "aws_route_table_association" "group07-user04-rtb-asso1" {
+  subnet_id      = "${aws_subnet.group07-user04-subnet1.id}"
+  route_table_id = "${aws_route_table.group07-user04-rtb.id}"
+}
+
+resource "aws_route_table_association" "group07-user04-rtb-asso" {
+  subnet_id      = "${aws_subnet.group07-user04-subnet2.id}"
+  route_table_id = "${aws_route_table.group07-user04-rtb.id}"
+}
+
+
+# 시큐리티 그룹
+[security_group.tf]
+resource "aws_security_group" "group07-user02-sg1" {
+  vpc_id = "${aws_vpc.group07-user04-vpc.id}"
+  name = "group07-user02-sg1"
+
+  ingress {
+    protocol  = tcp
+    self      = true
+    from_port = 0
+    to_port   = 0
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "group07-user04-sg1"
+  }
+}
+
+# 인스턴스 생성
+[EC2.tf]
+#resource "aws_eip" "group07-user04-web1" {
+#  instance = "${aws_instance.group07-user04-web1.id}"
+#  vpc      = true
+#}
+
+resource "aws_instance" "group07-user04-web1" {
+#  ami               = "ami-0c3fd0f5d33134a76"  #Amazon Linux
+  ami               = "ami-096c57cee908da809"  #Ubuntu 16.04
+  availability_zone = "ap-northeast-1a"
+  instance_type     = "t2.nano"
+  key_name          = "group07-user04"
+
+  vpc_security_group_ids = [
+    "${aws_security_group.group07-user02-sg1.id}"
+  ]
+
+  subnet_id  = "${aws_subnet.group07-user04-subnet1.id}"
+  associate_public_ip_address = true
+
+  tags = {
+    Name = "group07-user04-web1"
+  }
+}
+
+
+## key Pari(***.pem) 파일  Cloud9에 업로드
+File --> File - Upload Local File 기능 이용
+
+# *.pem 파일 설정 변경
+chmod 400 group07-user04.pem
+
+
+## 웹서버 접속
+ssh -i group07-user04.pem ubuntu@54.238.99.225
+
+## 웹서버에 아파치, php 인스톨
+sudo -s
+apt-get updates
+apt-get install apache2
+apt-get install php
+apt-get install libapache2-mod-php7.0
+apt-get install php-mysql
+
+# 웹서버 정상 확인
+브라우저: 54.238.99.225
+
+
+####################################
+GitHub  계정: skcncuser3
+Password: Skcnc123!@#
+
+조별실습
+ https://github.com/skcncuser3/group*.git
+ ex)group1, group2
+
+개인실습
+ https://github.com/skcncuser3/user**.git
+ ex)user01, user02
+
+
+user04@2miles.onmicrosoft.com

@@ -1,0 +1,169 @@
+
+
+
+1) AWS 파일 작성시
+ - nat gw에서 vpc = trun와 false 차이?
+ - security default group 이 있는 이유? 역할은? 광훈선임 파일에는 없음
+ - 
+
+
+
+
+
+***********************(아래는 과거 데이터)***************************************
+
+<문의사항>
+1) AWS에서 terraform 진행시 access key와 secret key는 어떻게 생성해야 하는건지?
+2) AWS에서 terraform 진행시 전성규 선임 자료에서 로드밸런싱 부터 잘 모르겠음
+3) 광훈 선임 파일에서 apach 등 설치가 나오는데 어떤 과정인지 모르겠음
+4) azure에서 aws cloud9처럼 파일이 좌측에 뜨면 좋은데 작성 및 저장한 파일을 동시에 보면서 bash shell에서 작업하는 방법을 모르겠음
+5) 
+
+
+
+<<<<<<<<<<<aws terraform>>>>>>>>>>>>>>
+
+<provider.tf>
+provider "aws" {
+  region     = "ap-northeast-1"
+}
+
+
+<vpc.tf>
+resource "aws_vpc" "s6059-vpc" {
+    cidr_block = "107.0.0.0/16"
+    instance_tenancy = "default"
+    enable_dns_support = "true"
+    enable_dns_hostnames = "true"
+    tags {
+        Name = "s6059-vpc"
+    }
+}
+
+
+
+<igw.tf>
+# Internet GW
+resource "aws_internet_gateway" "s6059-igw" {
+    vpc_id = "${aws_vpc.s6059-vpc.id}"
+
+    tags {
+        Name = "s60c060559-igw"
+    }
+}
+
+
+
+<subnet.tf>
+# Subnets
+resource "aws_subnet" "s6059-vpc-subnet1" {
+    vpc_id = "${aws_vpc.s6059-vpc.id}"
+    cidr_block = "107.0.1.0/24"
+    availability_zone = "ap-northeast-1a"
+
+    tags {
+        Name = "s6059-vpc-subnet1"
+    }
+}
+resource "aws_subnet" "s6059-vpc-subnet2" {
+    vpc_id = "${aws_vpc.s6059-vpc.id}"
+    cidr_block = "107.0.2.0/24"
+    availability_zone = "ap-northeast-1a"
+
+    tags {
+        Name = "s6059-vpc-subnet2"
+    }
+}
+
+
+
+<eip.tf>
+# nat gw
+resource "aws_eip" "s6059-nat1" {
+  vpc      = true(or false)
+}
+resource "aws_eip" "s6059-nat2" {
+  vpc      = true(or false)
+}
+
+
+<nat_gateway.tf>
+resource "aws_nat_gateway" "s6059-natgw1" {
+  allocation_id = "${aws_eip.s6059-nat1.id}"
+  subnet_id = "${aws_subnet.s6059-vpc-subnet1.id}"
+}
+resource "aws_nat_gateway" "s6059-natgw2" {
+  allocation_id = "${aws_eip.s6059-nat2.id}"
+  subnet_id = "${aws_subnet.s6059-vpc-subnet2.id}"
+}
+
+
+<route_tabel.tf>
+# route tables
+resource "aws_route_table" "s6059-rtb" {
+    vpc_id = "${aws_vpc.s6059-vpc.id}"
+    route {
+        cidr_block = "0.0.0.0/0"
+        gateway_id = "${aws_internet_gateway.s6059-igw.id}"
+    }
+
+    tags {
+        Name = "s6059-rtb"
+    }
+}
+
+# route associations public
+resource "aws_route_table_association" "s6059-rtb-asso1" {
+    subnet_id = "${aws_subnet.s6059-vpc-subnet1.id}"
+    route_table_id = "${aws_route_table.s6059-rtb.id}"
+}
+resource "aws_route_table_association" "s6059-rtb-asso2" {
+    subnet_id = "${aws_subnet.s6059-vpc-subnet2.id}"
+    route_table_id = "${aws_route_table.s6059-rtb.id}"
+}
+
+
+<security_group.tf>
+resource "aws_security_group" "s6059-sg1" {
+  vpc_id = "${aws_vpc.s6059-vpc.id}"
+  name = "s6059-sg1"
+  egress {
+      from_port = 0
+      to_port = 0
+      protocol = "-1"
+      cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+      self = true
+      from_port = 0
+      to_port = 0
+      protocol = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+  } 
+tags {
+    Name = "s6059-sg1"
+  }
+}
+
+
+
+<EC2.tf>
+resource "aws_instance" "s6059-web1" {
+  ami = "ami-096c57cee908da809"
+  availability_zone = "ap-northeast-1a"
+  instance_type = "t2.nano"
+  key_name = "s6059"
+  vpc_security_group_ids = ["${aws_security_group.s6059-sg1.id}"]
+  subnet_id = "${aws_subnet.s6059-vpc-subnet1.id}"
+  associate_public_ip_address = true
+    tags = {
+    Name = "s6059-web1"
+  }
+}
+
+
+<
+
+
+

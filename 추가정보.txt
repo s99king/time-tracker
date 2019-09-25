@@ -1,0 +1,62 @@
+************************************************************************************
+- github
+ => 강사님 싸이트 : github.com/Finfra
+ => 내 github 계정 : sh.song@sk.com / Rayson)520
+************************************************************************************
+
+************************************************************************************
+- Terraform 쪽만 순서
+
+  1) cloud9 AWS 상에서 처음 설치 구성 및 실행
+
+  2) 처음 cloud9 설치 후 아래 커맨드를 쳐서 terraform 기본 파일을 가져와서 업데이트 시킨다
+    wget https://releases.hashicorcom/terraform/0.12.8/terraform_0.12.8_linux_amd64.zip
+    (curl -O https://releases.hashicorp.com/terraform/0.11.3/terraform_0.11.3_linux_amd64.zip)
+    sudo unzip terraform_0.12.8_linux_amd64.zip
+    (sudo unzip terraform_0.11.3_linux_amd64.zip -d /usr/local/bin)
+    sudo yum -y update
+    sudo yum -y install aws-cli
+    aws --version 
+    강사님 terraform 기본 예제 가져오려면 git clone https://github.com/Finfra/terraform-course.git 치면 됨
+
+  3) aws-provider.tf 파일 수정. 각 계정에 해당하는 id 값으로 수정
+     + aws(access_key, secret_key) : IAM credential 에서 생성(엑셀 파일 다운로드)
+     => aws 포탈에 가서 우측 상단에 내 계정 쪽 클리하면 "My Security Credentials"이 있고 클릭하면 중간 쯤에 "Access keys for CLI, SDK..."가 있다. 여기서 "Create access key" 클릭하여 신규 생성 후 다운 받으면 내 access_key와 secret_key 확인 가능. 파일 저장 및 향후 활용
+
+  4) cloud9에서 aws 파일 만들기 진행 및 완료
+
+  5) aws instance key 값 확인 , EC2 -> keypair 생성 -> .pem 파일 다운로드 , cloud9에 복사(동일 디렉터리) , aws.tf 파일 내 instance key name에 해당 key name 입력
+
+  6) *.pem 파일 설정 변경 : "chmod 400 s6059-keypair.pem"을 cloud9에서 입력
+
+  7) cloud9에서 내가 만든 파일 있는 폴더로 이동하여 "terraform init" "terraform plan" "terraform apply" 실행
+
+  8) azure로 가서 azure portal gui에서 Azure_terraform.ppt 3~7 page 수행. 각 key 값등을 메모장 등에 저장
+  
+  9) cloud9에서 azure terraform 관련 파일 작성 및 생성. 8)에서 생성한 key 값 등은 azure-provider.tf 파일에 작성 수정 진행. azure.tf 파일에서 유의할 것은 "os profile" 부분에서 admin 계정 정보를 수정해야 하는 것. 
+
+  10) "terraform init" "terraform plan" "terraform apply" 실행
+
+  11-1) aws instance web 실행 작업(11-1~3 과정은 web1과 web2 각각 공인IP로 접속해서 둘 다 실행시켜 줘야 한다) : cloud9에서 "chmod 400 s6059-keypair.pem" , "ssh -i s6059-keypair.pem 13.114.254.34(EC2의 web1 instance의 공인 IP 등) 입력하여 해당 웹서버 bash shell로 이동
+
+  11-2) ssh 이동 후 다음 명령어 입력 : "sudo -i" , "yum install php" , "yum install httpd" , "systemctl start httpd" , (firewall은 안될수도 있음)"firewall-cmd --zone=public --add-port=80/tcp --permanent" , "firewall-cmd ?reload"
+
+  11-3) 인터넷 창으로 ip 입력해서 접속하면 화면 뜸 완료
+
+  12-1) azure instance web 실행 작업(12-1~3 과정은 web1과 web2 각각 공인IP로 접속해서 둘 다 실행시켜 줘야 한다) : cloud9에서 "ssh s99king@52.12.123.321"로 접속(해당 웹 접속 id와 패스워드는 azure.tf 파일에서 "vm" 생성 쪽 보면 "os_profile"부분의 id/pass 입력 사항을 입력하면 됨)
+
+  12-2) ssh 이동 후 다음 명령어 입력 : "sudo -i" , yum install php , "systemctl start httpd" , "firewall-cmd --zone=public --add-port=80/tcp --permanent" , "firewall-cmd -?reload"
+
+  12-3) 인터넷 창으로 ip 입력해서 접속하면 화면 뜸 완료
+
+  13) traffic manager에 AWS DNS endpoint 추가 : aws ec2->load balancing -> DNS name 복사하고 azure로 가서 azure resource group -> s6059-rg -> s6059-trafficmanager -> second -> DNS 란에 aws DNS 추가
+
+
+
+************************************************************************************
+
+
+ => cloud 9 기본 폴더 하단에 내 폴더(mytest 등) 만들어 그 하단에 신규 vpc.tf 파일등을 생성하여  파일 만듦. 중간 중간 해당 "mytest" 내 폴더에서 "terraform init" 및 "terraform apply 후 yes" 등을 실행하면서 AWS 상에서 VPC 및 EC2 등이 생성 되는 것을 확인 한다.
+
+ => azure에서는 Azure_terraform.ppt 파일의 3~7면 우선 실행
+ => azure에서 테라폼 진행시 설정 config 파일은 어디에 저장되고 어떻게 볼 수 있나? aws와 달리 어디서 보는지 모르겠음.

@@ -1,68 +1,85 @@
-## vpc ##
-resource "aws_vpc" "group7-users11-vpc" {
-  cidr_block           = "111.0.0.0/16"
+resource "aws_vpc" "awsvpc" {
+  cidr_block           = "192.168.1.0/24"
   enable_dns_hostnames = true
   enable_dns_support   = true
   instance_tenancy     = "default"
   tags                 = { 
-        Name           = "group7-users11-vpc"
+        Name           = "dt2-vpc"
     }
 }
 
-## internet gateway ##
-resource "aws_internet_gateway" "group7-users11-igw" {
-  vpc_id               = "${aws_vpc.group7-users11-vpc.id}"
+resource "aws_internet_gateway" "awsipg" {
+  vpc_id               = "${aws_vpc.awsvpc.id}"
   tags                 = { 
-        Name           = "group7-users11-igw"
+        Name           = "dt2-igw"
     }
 }
 
-## subnet ##
-resource "aws_subnet" "group7-users11-subnet-a" {
-  vpc_id               = "${aws_vpc.group7-users11-vpc.id}"
-  availability_zone    = "ap-northeast-1a"
-  cidr_block           = "111.0.1.0/24"
+resource "aws_subnet" "public_1a" {
+  vpc_id               = "${aws_vpc.awsvpc.id}"
+  availability_zone    = "ap-northeast-2a"
+  cidr_block           = "192.168.1.0/25"
   tags                 = { 
-        Name           = "group7-users11-subnet-a"
+        Name           = "dt2-public-1a"
     }
 }
 
-resource "aws_subnet" "group7-users11-subnet-b" {
-  vpc_id               = "${aws_vpc.group7-users11-vpc.id}"
-  availability_zone    = "ap-northeast-1c"
-  cidr_block           = "111.0.2.0/24"
+resource "aws_subnet" "public_1b" {
+  vpc_id               = "${aws_vpc.awsvpc.id}"
+  availability_zone    = "ap-northeast-2c"
+  cidr_block           = "192.168.1.128/25"
   tags                 = {  
-         Name          = "group7-users11-subnet-b"
+         Name          = "dt2-public-1b"
     }
 }
 
-## routing table ##
-resource "aws_route_table" "group7-users11-rt" {
-  vpc_id = "${aws_vpc.group7-users11-vpc.id}"
+resource "aws_eip" "awseip3" {
+  vpc = false
+  tags={name="dt2-eip3"}
+}
+
+resource "aws_eip" "awseip4" {
+  vpc = false
+  tags={name="dt2-eip4"}
+}
+
+resource "aws_nat_gateway" "natgate_1a" {
+  allocation_id = "${aws_eip.awseip3.id}"
+  subnet_id     = "${aws_subnet.public_1a.id}"
+  tags={name="dt2-ngw-1a"}
+}
+
+resource "aws_nat_gateway" "natgate_1b" {
+  allocation_id = "${aws_eip.awseip4.id}"
+  subnet_id     = "${aws_subnet.public_1b.id}"
+  tags={name="dt2-ngw-1b"}
+}
+
+resource "aws_route_table" "awsrtp" {
+  vpc_id = "${aws_vpc.awsvpc.id}"
 
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = "${aws_internet_gateway.group7-users11-igw.id}"
+    gateway_id = "${aws_internet_gateway.awsipg.id}"
   }
   
-  tags         = {
-    Name       = "group7-users11-rt"
-  }
+  tags={name="dt2-rt"}
 }
 
-## subnet attach to rtb ##
-resource "aws_route_table_association" "group7-users11-rtsub-a" {
-  subnet_id      = "${aws_subnet.group7-users11-subnet-a.id}"
-  route_table_id = "${aws_route_table.group7-users11-rt.id}"  
+resource "aws_route_table_association" "awsrtp1a" {
+  subnet_id      = "${aws_subnet.public_1a.id}"
+  route_table_id = "${aws_route_table.awsrtp.id}"
+  
 }
 
-resource "aws_route_table_association" "group7-users11-rtsub-b" {
-  subnet_id      = "${aws_subnet.group7-users11-subnet-b.id}"
-  route_table_id = "${aws_route_table.group7-users11-rt.id}"  
+resource "aws_route_table_association" "aiwsrtp1b" {
+  subnet_id      = "${aws_subnet.public_1b.id}"
+  route_table_id = "${aws_route_table.awsrtp.id}"
+  
 }
 
-resource "aws_default_security_group" "group7-users11-sg" {
-  vpc_id = "${aws_vpc.group7-users11-vpc.id}"
+resource "aws_default_security_group" "awssecurity" {
+  vpc_id = "${aws_vpc.awsvpc.id}"
 
   ingress {
     protocol  = -1
@@ -78,16 +95,48 @@ resource "aws_default_security_group" "group7-users11-sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
   
-  tags          = { 
-     Name       = "group7-users11-sg"
-  }
+  tags={name="dt2-dsg"}
 } 
 
-resource "aws_security_group" "group7-users11-web-sg" {
+resource "aws_default_network_acl" "awsnetworkacl" {
+  default_network_acl_id = "${aws_vpc.awsvpc.default_network_acl_id}"
+
+  ingress {
+    protocol   = -1
+    rule_no    = 100
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 0
+    to_port    = 0
+  }
+
+  egress {
+    protocol   = -1
+    rule_no    = 100
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 0
+    to_port    = 0
+  }
+
+  subnet_ids = [
+    "${aws_subnet.public_1a.id}",
+    "${aws_subnet.public_1b.id}",
+  ]
+  
+  tags={name="dt2-nacl"}
+}
+
+variable "amazon_linux" {
+  # Amazon Linux AMI 2017.03.1 (HVM), SSD Volume Type - ami-4af5022c
+  default = "ami-095ca789e0549777d"
+}
+
+resource "aws_security_group" "webserverSecurutyGroup" {
   name        = "webserverSecurutyGroup"
   description = "open ssh port for webserverSecurutyGroup"
 
-  vpc_id = "${aws_vpc.group7-users11-vpc.id}"
+  vpc_id = "${aws_vpc.awsvpc.id}"
 
   ingress {
     from_port   = 22
@@ -109,99 +158,56 @@ resource "aws_security_group" "group7-users11-web-sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
-  tags          = {
-    Name        = "group7-users11-web-sg"
-  }
+  tags={name="dt2-websg"}
 }
 
-resource "aws_default_network_acl" "group7-users11-nacl" {
-  default_network_acl_id = "${aws_vpc.group7-users11-vpc.default_network_acl_id}"
-
-  ingress {
-    protocol   = -1
-    rule_no    = 100
-    action     = "allow"
-    cidr_block = "0.0.0.0/0"
-    from_port  = 0
-    to_port    = 0
-  }
-
-  egress {
-    protocol   = -1
-    rule_no    = 100
-    action     = "allow"
-    cidr_block = "0.0.0.0/0"
-    from_port  = 0
-    to_port    = 0
-  }
-
-  subnet_ids = [
-    "${aws_subnet.group7-users11-subnet-a.id}",
-    "${aws_subnet.group7-users11-subnet-b.id}",
-  ]
-  
-  tags       = { 
-     Name    = "group7-users11-nacl"
-      
-  }
-}
-
-resource "aws_instance" "group7-users11-web1" {
-  ami               = "ami-0ab3e16f9c414dee7"
-  availability_zone = "ap-northeast-1a"
+resource "aws_instance" "web1" {
+  ami               = "${var.amazon_linux}"
+  availability_zone = "ap-northeast-2a"
   instance_type     = "t2.micro"
-  key_name = "user11_key"
+  key_name = "sre-aws-mgmtvm-test"
   vpc_security_group_ids = [
-    "${aws_security_group.group7-users11-web-sg.id}",
-    "${aws_default_security_group.group7-users11-sg.id}",
+    "${aws_security_group.webserverSecurutyGroup.id}",
+    "${aws_default_security_group.awssecurity.id}",
   ]
 
-  subnet_id                   = "${aws_subnet.group7-users11-subnet-a.id}"
+  subnet_id                   = "${aws_subnet.public_1a.id}"
   associate_public_ip_address = true
-  tags                        = {
-    Name                      = "group7-users11-web1"
-      
-  }
+  tags={name="dt2-web1"}
 }
 
-resource "aws_instance" "group7-users11-web2" {
-  ami               = "ami-0ab3e16f9c414dee7"
-  availability_zone = "ap-northeast-1c"
+resource "aws_instance" "web2" {
+  ami               = "${var.amazon_linux}"
+  availability_zone = "ap-northeast-2c"
   instance_type     = "t2.micro"
-  key_name = "user11_key"	
+  key_name = "sre-aws-mgmtvm-test"	
   vpc_security_group_ids = [
-    "${aws_security_group.group7-users11-web-sg.id}",
-    "${aws_default_security_group.group7-users11-sg.id}",
+    "${aws_security_group.webserverSecurutyGroup.id}",
+    "${aws_default_security_group.awssecurity.id}",
   ]
 				
-  subnet_id                   = "${aws_subnet.group7-users11-subnet-b.id}"
+  subnet_id                   = "${aws_subnet.public_1b.id}"
   associate_public_ip_address = true
-  tags                        = {
-     Name                     = "group7-users11-web2"
-      
-  }
+  tags={name="dt2-web2"}
 }
-
-resource "aws_alb" "group7-users11-frontend" {
-  name            = "group7-users11-salb"
+	
+resource "aws_alb" "frontend" {
+  name            = "dt2-alb"
   internal        = false
-  security_groups = ["${aws_security_group.group7-users11-web-sg.id}"]
+  security_groups = ["${aws_security_group.webserverSecurutyGroup.id}"]
   subnets         = [
-    "${aws_subnet.group7-users11-subnet-a.id}",
-    "${aws_subnet.group7-users11-subnet-b.id}"
+    "${aws_subnet.public_1a.id}",
+    "${aws_subnet.public_1b.id}"
   ]
   lifecycle { create_before_destroy = true }
-  tags            = {
-      Name        = "group7-users11-salb"
-      
-  }
+  tags={name="dt2-alb"}
 }
 
-resource "aws_alb_target_group" "group7-users11-frontendalb" {
-  name     = "group7-users11-albtg"
+resource "aws_alb_target_group" "frontendalb" {
+  name     = "dt2-alb-tg"
   port     = 80
   protocol = "HTTP"
-  vpc_id   = "${aws_vpc.group7-users11-vpc.id}"
+  vpc_id   = "${aws_vpc.awsvpc.id}"
 
   health_check {
     interval            = 30
@@ -209,32 +215,28 @@ resource "aws_alb_target_group" "group7-users11-frontendalb" {
     healthy_threshold   = 3
     unhealthy_threshold = 3				
   }
-  tags     = {
-      Name = "group7-users11-albtg"
-      
-  }
+  tags={name="dt2-alb-tg"}
 }
 
-resource "aws_alb_target_group_attachment" "group7-users11-frontend1" {
-  target_group_arn = "${aws_alb_target_group.group7-users11-frontendalb.arn}"
-  target_id        = "${aws_instance.group7-users11-web1.id}"
+resource "aws_alb_target_group_attachment" "frontend1" {
+  target_group_arn = "${aws_alb_target_group.frontendalb.arn}"
+  target_id        = "${aws_instance.web1.id}"
   port             = 80
 }
 
-resource "aws_alb_target_group_attachment" "group7-users11-frontend2" {
-  target_group_arn = "${aws_alb_target_group.group7-users11-frontendalb.arn}"
-  target_id        = "${aws_instance.group7-users11-web2.id}"
+resource "aws_alb_target_group_attachment" "frontend2" {
+  target_group_arn = "${aws_alb_target_group.frontendalb.arn}"
+  target_id        = "${aws_instance.web2.id}"
   port             = 80
 }
 
-resource "aws_alb_listener" "group7-users11-http" {
-  load_balancer_arn = "${aws_alb.group7-users11-frontend.arn}"
+resource "aws_alb_listener" "http" {
+  load_balancer_arn = "${aws_alb.frontend.arn}"
   port              = "80"
   protocol          = "HTTP"
 
   default_action {
-    target_group_arn = "${aws_alb_target_group.group7-users11-frontendalb.arn}"
+    target_group_arn = "${aws_alb_target_group.frontendalb.arn}"
     type             = "forward"
   }
 }
-
